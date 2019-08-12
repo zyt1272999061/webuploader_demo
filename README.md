@@ -590,14 +590,14 @@ public class UploadController {
 
    * 首页
 
-     ![index](D:\IdeaProjects\webuploader\images\index.bmp)
+     ![index](images\index.bmp)
 
    * 选择文件
 
-     ![等待上传](D:\IdeaProjects\webuploader\images\等待上传.bmp)
+     ![等待上传](images\等待上传.bmp)
 
    * 开始上传/暂停上传
 
-     ![暂停上传](D:\IdeaProjects\webuploader\images\暂停上传.bmp)
+     ![暂停上传](images\暂停上传.bmp)
 
    
