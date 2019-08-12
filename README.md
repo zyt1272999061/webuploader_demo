@@ -6,14 +6,14 @@
 
 ## 二、技术介绍
 
-* spring官网：https://spring.io/projects/spring-boot/
+* springboot官网：https://spring.io/projects/spring-boot/
 * thymeleaf官网：https://www.thymeleaf.org/
 * webuploader官网：https://fex.baidu.com/webuploader/
 * bootstrap官网：https://www.bootcss.com/
 
 ## 三、页面效果
 
-1. 访问路径：http://localhost:8080/upload/index 
+1. 下载项目，启动并访问：http://localhost:8080/upload/index 
 
 2. 页面效果
 
@@ -137,7 +137,7 @@ st->op->op1->op2()->e
 
 3. 上传页面
 
-   * 页面引入css、js
+   * 引入css、js
 
      ```html
      <link rel="stylesheet" th:href="@{/webuploader/webuploader.css}"/>
