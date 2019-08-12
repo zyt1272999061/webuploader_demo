@@ -90,9 +90,7 @@ st->op->op1->op2()->e
    
            </plugins>
        </build>
-   
    </project>
-   
    ```
 
    
@@ -115,276 +113,282 @@ st->op->op1->op2()->e
    spring.servlet.multipart.enabled=true
    spring.servlet.multipart.max-file-size=5GB
    spring.servlet.multipart.max-request-size=5GB
-   
    ```
 
    
 
 3. 上传页面
 
-   ```html
-   <!DOCTYPE html>
-   <html lang="en" xml:th="http://www.thymeleaf.org" xmlns:th="http://www.w3.org/1999/xhtml">
-   <link>
-   <meta charset="UTF-8">
-   <title>Title</title>
-   <link rel="stylesheet" th:href="@{/webuploader/webuploader.css}"/>
-   <!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
-   <link rel="stylesheet" th:href="@{/bootstrap/css/bootstrap.min.css}">
-   </head>
-   <body>
-   <div class="container">
-       <div class="row" style="margin-top: 20px;">
-           <div class="col-md-12">
-               <div class="panel panel-default">
-                   <div class="panel-heading">
-                       <h3 class="panel-title">上传</h3>
-                   </div>
-                   <div class="panel-body">
-                       <div id="uploader" class="wu-example">
-                           <!--用来存放文件信息-->
-                           <div id="thelist" class="uploader-list"></div>
-                           <div class="btns">
-                               <div id="picker">选择文件</div>
-                               <button id="ctlBtn" class="btn btn-default">开始上传</button>
-                           </div>
-                       </div>
-                   </div>
-               </div>
-   
-           </div>
-       </div>
-   </div>
-   </body>
-   <!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
-   <script type="application/javascript" th:src="@{/bootstrap/js/bootstrap.min.js}"></script>
-   <script type="application/javascript" th:src="@{/js/jquery-3.4.1.min.js}"></script>
-   <script type="application/javascript" th:src="@{/webuploader/webuploader.js}"></script>
-   <script th:inline="javascript" type="application/javascript">
-       /*<![CDATA[*/
-       var $ = jQuery,
-           $list = $('#thelist'),
-           $btn = $('#ctlBtn'),
-           state = 'pending',
-           uploader;
-       var fileMd5;//文件的MD5值
-       var fileName;//文件名称
-       var blockSize = 10 * 1024 * 1024;
-       var md5Arr = new Array(); //文件MD5数组
-       var timeArr = new Array();//文件上传时间戳数组
-       WebUploader.Uploader.register({
-           "before-send-file": "beforeSendFile",//整个文件上传前
-           "before-send": "beforeSend",//每个分片上传前
-           "after-send-file": "afterSendFile"//分片上传完毕
-       }, {
-           //1.生成整个文件的MD5值
-           beforeSendFile: function (file) {
-               var index = file.id.slice(8);//文件下标
-               var startTime = new Date();//一个文件上传初始化时，开始计时
-               timeArr[index] = startTime;//将每一个文件初始化时的时间放入时间数组
-               var deferred = WebUploader.Deferred();
-               //计算文件的唯一标记fileMd5，用于断点续传  如果.md5File(file)方法里只写一个file参数则计算MD5值会很慢 所以加了后面的参数：10*1024*1024
-               (new WebUploader.Uploader())
-                   .md5File(file, 0, blockSize)
-                   .progress(function (percentage) {
-                       $('#' + file.id).find('p.state').text('正在读取文件信息...');
-                   })
-                   .then(function (value) {
-                       $("#" + file.id).find('p.state').text('成功获取文件信息...');
-                       fileMd5 = value;
-                       var index = file.id.slice(8);
-                       md5Arr[index] = fileMd5;//将文件的MD5值放入数组，以便分片合并时能够取到当前文件对应的MD5
-                       uploader.options.formData.guid = fileMd5;//全局的MD5
-                       deferred.resolve();
-                   });
-               fileName = file.name;
-               return deferred.promise();
-           },
-           //2.如果有分快上传，则每个分块上传前调用此函数
-           beforeSend: function (block) {
-               var deferred = WebUploader.Deferred();
-               $.ajax({
-                   type: "POST",
-                   url: /*[[@{/upload/checkblock}]]*/, //ajax验证每一个分片
-                   data: {
-                       //fileName: fileName,
-                       //fileMd5: fileMd5, //文件唯一标记
-                       chunk: block.chunk, //当前分块下标
-                       chunkSize: block.end - block.start,//当前分块大小
-                       guid: uploader.options.formData.guid,
-                   },
-                   cache: false,
-                   async: false, // 与js同步
-                   timeout: 1000, // 超时的话，只能认为该分片未上传过
-                   dataType: "json",
-                   success: function (response) {
-                       if (response.ifExist) {
-                           //分块存在，跳过
-                           deferred.reject();
-                       } else {
-                           //分块不存在或不完整，重新发送该分块内容
-                           deferred.resolve();
-                       }
-                   }
-               });
-               this.owner.options.formData.fileMd5 = fileMd5;
-               deferred.resolve();
-               return deferred.promise();
-           },
-           //3.当前所有的分块上传成功后调用此函数
-           afterSendFile: function (file) {
-               //如果分块全部上传成功，则通知后台合并分块
-               var index = file.id.slice(8);//获取文件的下标
-               $('#' + file.id).find('p.state').text('已上传');
-               $.post(/*[[@{/upload/combine}]]*/, {"guid": md5Arr[index], fileName: file.name},
-                   function (data) {
-                   }, "json");
-           }
-       });
-   
-       //上传方法
-       uploader = WebUploader.create({
-           // swf文件路径
-           swf: '@{webuploader/Uploader.swf}',
-           // 文件接收服务端。
-           server: /*[[@{/upload/save}]]*/,
-           // 选择文件的按钮。可选。
-           // 内部根据当前运行是创建，可能是input元素，也可能是flash.
-           pick: '#picker',
-           chunked: true, //分片处理
-           chunkSize: 10 * 1024 * 1024, //每片5M
-           threads: 3,//上传并发数。允许同时最大上传进程数。
-           // 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
-           resize: false
-       });
-       // 当有文件被添加进队列的时候
-       uploader.on('fileQueued', function (file) {
-           //文件列表添加文件页面样式
-           $list.append('<div id="' + file.id + '" class="item">' +
-               '<div class="row">\n' +
-               '<div class="col-md-11"><h4 class="info">' + file.name + '</h4></div>\n' +
-               '<div class="col-md-1"><button class="btn btn-info delbtn" onclick="delFile(\'' + file.id + '\')">删除</button></div>\n' +
-               '</div>\n' +
-               '<div class="row">\n' +
-               '<div class="col-md-5"><p class="state">等待上传...</p></div>\n' +
-               '<div class="col-md-7"><span class="time"></span></div>\n' +
-               '</div>');
-       });
-       // 文件上传过程中创建进度条实时显示
-       uploader.on('uploadProgress', function (file, percentage) {
-           //计算每个分块上传完后还需多少时间
-           var index = file.id.slice(8);//文件的下标
-           var currentTime = new Date();
-           var timeDiff = currentTime.getTime() - timeArr[index].getTime();//获取已用多少时间
-           var timeStr;
-           //如果percentage==1说明已经全部上传完毕，则需更改页面显示
-           if (1 == percentage) {
-               timeStr = "上传用时：" + countTime(timeDiff);//计算总用时
-           } else {
-               timeStr = "预计剩余时间：" + countTime(timeDiff / percentage * (1 - percentage));//估算剩余用时
-           }
-           //创建进度条
-           var $li = $('#' + file.id), $percent = $li.find('.progress .progress-bar');
-           // 避免重复创建
-           if (!$percent.length) {
-               $percent = $(
-                   '<div class="progress progress-striped active">'
-                   + '<div class="progress-bar" role="progressbar" style="width: 0%">'
-                   + '</div>' + '</div>')
-                   .appendTo($li).find('.progress-bar');
-           }
-           $li.find('p.state').text('上传中');
-           $li.find('span.time').text(timeStr);
-           $percent.css('width', percentage * 100 + '%');
-       });
-       /*    uploader.on('uploadSuccess', function (file) {
-               var index = file.id.slice(8);
-               $('#' + file.id).find('p.state').text('已上传');
-               $.post(/!*[[@{/upload/combine}]]*!/, {
-                   "guid": md5Arr[index],
-                   fileName: file.name,
-               }, function () {
-                   uploader.removeFile(file);
-               }, "json");
-           });*/
-   
-       //上传失败时
-       uploader.on('uploadError', function (file) {
-           $('#' + file.id).find('p.state').text('上传出错');
-       });
-       //上传完成时
-       uploader.on('uploadComplete', function (file) {
-           $('#' + file.id).find('.progress').fadeOut();
-       });
-       //上传状态
-       uploader.on('all', function (type) {
-           if (type === 'startUpload') {
-               state = 'uploading';
-           } else if (type === 'stopUpload') {
-               state = 'paused';
-           } else if (type === 'uploadFinished') {
-               state = 'done';
-           }
-           if (state === 'uploading') {
-               $btn.text('暂停上传');
-           } else {
-               $btn.text('开始上传');
-           }
-       });
-       //开始上传，暂停上传的函数
-       $btn.on('click', function () {
-           //每个文件的删除按钮不可用
-           $(".delbtn").attr("disabled", true);
-           if (state === 'uploading') {
-               uploader.stop(true);//暂停
-               //删除按钮可用
-               $(".delbtn").removeAttr("disabled");
-           } else {
-               uploader.upload();
-           }
-       });
-       //删除文件
-       function delFile(id) {
-           //将文件从uploader的文件列表中删除
-           uploader.removeFile(uploader.getFile(id, true));
-           //清除页面元素
-           $("#" + id).remove();
-       }
-       //获取上传时还需多少时间
-       function countTime(date) {
-           var str = "";
-           //计算出相差天数
-           var days = Math.floor(date / (24 * 3600 * 1000))
-           if (days > 0) {
-               str += days + " 天 ";
-           }
-           //计算出小时数
-           var leave1 = date % (24 * 3600 * 1000) //计算天数后剩余的毫秒数
-           var hours = Math.floor(leave1 / (3600 * 1000))
-           if (hours > 0) {
-               str += hours + " 小时 ";
-           }
-           //计算相差分钟数
-           var leave2 = leave1 % (3600 * 1000) //计算小时数后剩余的毫秒数
-           var minutes = Math.floor(leave2 / (60 * 1000))
-           if (minutes > 0) {
-               str += minutes + " 分 ";
-           }
-           //计算相差秒数
-           var leave3 = leave2 % (60 * 1000) //计算分钟数后剩余的毫秒数
-           var seconds = Math.round(leave3 / 1000)
-           if (seconds > 0) {
-               str += seconds + " 秒 ";
-           } else {
-               /* str += parseInt(date) + " 毫秒"; */
-               str += " < 1 秒";
-           }
-           return str;
-       }
-       /*]]>*/
-   </script>
-   </html>
-   ```
+   * 页面引入css、js
+
+     ```html
+     <link rel="stylesheet" th:href="@{/webuploader/webuploader.css}"/>
+     <!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
+     <link rel="stylesheet" th:href="@{/bootstrap/css/bootstrap.min.css}">
+     <!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
+     <script type="application/javascript" th:src="@{/bootstrap/js/bootstrap.min.js}"></script>
+     <script type="application/javascript" th:src="@{/js/jquery-3.4.1.min.js}"></script>
+     <script type="application/javascript" th:src="@{/webuploader/webuploader.js}">
+     ```
+
+     
+
+   * 页面HTML
+
+     ```html
+     <div class="container">
+         <div class="row" style="margin-top: 20px;">
+             <div class="col-md-12">
+                 <div class="panel panel-default">
+                     <div class="panel-heading">
+                         <h3 class="panel-title">上传</h3>
+                     </div>
+                     <div class="panel-body">
+                         <div id="uploader" class="wu-example">
+                             <!--用来存放文件信息-->
+                             <div id="thelist" class="uploader-list"></div>
+                             <div class="btns">
+                                 <div id="picker">选择文件</div>
+                                 <button id="ctlBtn" class="btn btn-default">开始上传</button>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+     
+             </div>
+         </div>
+     </div>
+     ```
+
+     
+
+   * javascript
+
+     ```javascript
+     <script th:inline="javascript" type="application/javascript">
+         /*<![CDATA[*/
+         var $ = jQuery,
+             $list = $('#thelist'),
+             $btn = $('#ctlBtn'),
+             state = 'pending',
+             uploader;
+     var fileMd5;//文件的MD5值
+     var fileName;//文件名称
+     var blockSize = 10 * 1024 * 1024;
+     var md5Arr = new Array(); //文件MD5数组
+     var timeArr = new Array();//文件上传时间戳数组
+     WebUploader.Uploader.register({
+         "before-send-file": "beforeSendFile",//整个文件上传前
+         "before-send": "beforeSend",//每个分片上传前
+         "after-send-file": "afterSendFile"//分片上传完毕
+     }, {
+         //1.生成整个文件的MD5值
+         beforeSendFile: function (file) {
+             var index = file.id.slice(8);//文件下标
+             var startTime = new Date();//一个文件上传初始化时，开始计时
+             timeArr[index] = startTime;//将每一个文件初始化时的时间放入时间数组
+             var deferred = WebUploader.Deferred();
+             //计算文件的唯一标记fileMd5，用于断点续传  如果.md5File(file)方法里只写一个file参数则计算MD5值会很慢 所以加了后面的参数：10*1024*1024
+             (new WebUploader.Uploader())
+                 .md5File(file, 0, blockSize)
+                 .progress(function (percentage) {
+                 $('#' + file.id).find('p.state').text('正在读取文件信息...');
+             })
+                 .then(function (value) {
+                 $("#" + file.id).find('p.state').text('成功获取文件信息...');
+                 fileMd5 = value;
+                 var index = file.id.slice(8);
+                 md5Arr[index] = fileMd5;//将文件的MD5值放入数组，以便分片合并时能够取到当前文件对应的MD5
+                 uploader.options.formData.guid = fileMd5;//全局的MD5
+                 deferred.resolve();
+             });
+             fileName = file.name;
+             return deferred.promise();
+         },
+         //2.如果有分快上传，则每个分块上传前调用此函数
+         beforeSend: function (block) {
+             var deferred = WebUploader.Deferred();
+             $.ajax({
+                 type: "POST",
+                 url: /*[[@{/upload/checkblock}]]*/, //ajax验证每一个分片
+                 data: {
+                 //fileName: fileName,
+                 //fileMd5: fileMd5, //文件唯一标记
+                 chunk: block.chunk, //当前分块下标
+                 chunkSize: block.end - block.start,//当前分块大小
+                 guid: uploader.options.formData.guid,
+             },
+                    cache: false,
+                    async: false, // 与js同步
+                    timeout: 1000, // 超时的话，只能认为该分片未上传过
+                    dataType: "json",
+                    success: function (response) {
+                 if (response.ifExist) {
+                     //分块存在，跳过
+                     deferred.reject();
+                 } else {
+                     //分块不存在或不完整，重新发送该分块内容
+                     deferred.resolve();
+                 }
+             }
+         });
+         this.owner.options.formData.fileMd5 = fileMd5;
+         deferred.resolve();
+     return deferred.promise();
+     },
+         //3.当前所有的分块上传成功后调用此函数
+         afterSendFile: function (file) {
+             //如果分块全部上传成功，则通知后台合并分块
+             var index = file.id.slice(8);//获取文件的下标
+             $('#' + file.id).find('p.state').text('已上传');
+             $.post(/*[[@{/upload/combine}]]*/, {"guid": md5Arr[index], fileName: file.name},
+                 function (data) {
+                 }, "json");
+     }
+     });
+     
+     //上传方法
+     uploader = WebUploader.create({
+         // swf文件路径
+         swf: '@{webuploader/Uploader.swf}',
+         // 文件接收服务端。
+         server: /*[[@{/upload/save}]]*/,
+         // 选择文件的按钮。可选。
+         // 内部根据当前运行是创建，可能是input元素，也可能是flash.
+         pick: '#picker',
+         chunked: true, //分片处理
+         chunkSize: 10 * 1024 * 1024, //每片5M
+         threads: 3,//上传并发数。允许同时最大上传进程数。
+         // 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
+         resize: false
+     });
+     // 当有文件被添加进队列的时候
+     uploader.on('fileQueued', function (file) {
+         //文件列表添加文件页面样式
+         $list.append('<div id="' + file.id + '" class="item">' +
+                      '<div class="row">\n' +
+                      '<div class="col-md-11"><h4 class="info">' + file.name + '</h4></div>\n' +
+                      '<div class="col-md-1"><button class="btn btn-info delbtn" onclick="delFile(\'' + file.id + '\')">删除</button></div>\n' +
+                      '</div>\n' +
+                      '<div class="row">\n' +
+                      '<div class="col-md-5"><p class="state">等待上传...</p></div>\n' +
+                      '<div class="col-md-7"><span class="time"></span></div>\n' +
+                      '</div>');
+     });
+     // 文件上传过程中创建进度条实时显示
+     uploader.on('uploadProgress', function (file, percentage) {
+         //计算每个分块上传完后还需多少时间
+         var index = file.id.slice(8);//文件的下标
+         var currentTime = new Date();
+         var timeDiff = currentTime.getTime() - timeArr[index].getTime();//获取已用多少时间
+         var timeStr;
+         //如果percentage==1说明已经全部上传完毕，则需更改页面显示
+         if (1 == percentage) {
+             timeStr = "上传用时：" + countTime(timeDiff);//计算总用时
+         } else {
+             timeStr = "预计剩余时间：" + countTime(timeDiff / percentage * (1 - percentage));//估算剩余用时
+         }
+         //创建进度条
+         var $li = $('#' + file.id), $percent = $li.find('.progress .progress-bar');
+         // 避免重复创建
+         if (!$percent.length) {
+             $percent = $(
+                 '<div class="progress progress-striped active">'
+                 + '<div class="progress-bar" role="progressbar" style="width: 0%">'
+                 + '</div>' + '</div>')
+                 .appendTo($li).find('.progress-bar');
+         }
+         $li.find('p.state').text('上传中');
+         $li.find('span.time').text(timeStr);
+         $percent.css('width', percentage * 100 + '%');
+     });
+     /*    uploader.on('uploadSuccess', function (file) {
+                 var index = file.id.slice(8);
+                 $('#' + file.id).find('p.state').text('已上传');
+                 $.post(/!*[[@{/upload/combine}]]*!/, {
+                     "guid": md5Arr[index],
+                     fileName: file.name,
+                 }, function () {
+                     uploader.removeFile(file);
+                 }, "json");
+             });*/
+     
+     //上传失败时
+     uploader.on('uploadError', function (file) {
+         $('#' + file.id).find('p.state').text('上传出错');
+     });
+     //上传完成时
+     uploader.on('uploadComplete', function (file) {
+         $('#' + file.id).find('.progress').fadeOut();
+     });
+     //上传状态
+     uploader.on('all', function (type) {
+         if (type === 'startUpload') {
+             state = 'uploading';
+         } else if (type === 'stopUpload') {
+             state = 'paused';
+         } else if (type === 'uploadFinished') {
+             state = 'done';
+         }
+         if (state === 'uploading') {
+             $btn.text('暂停上传');
+         } else {
+             $btn.text('开始上传');
+         }
+     });
+     //开始上传，暂停上传的函数
+     $btn.on('click', function () {
+         //每个文件的删除按钮不可用
+         $(".delbtn").attr("disabled", true);
+         if (state === 'uploading') {
+             uploader.stop(true);//暂停
+             //删除按钮可用
+             $(".delbtn").removeAttr("disabled");
+         } else {
+             uploader.upload();
+         }
+     });
+     //删除文件
+     function delFile(id) {
+         //将文件从uploader的文件列表中删除
+         uploader.removeFile(uploader.getFile(id, true));
+         //清除页面元素
+         $("#" + id).remove();
+     }
+     //获取上传时还需多少时间
+     function countTime(date) {
+         var str = "";
+         //计算出相差天数
+         var days = Math.floor(date / (24 * 3600 * 1000))
+         if (days > 0) {
+             str += days + " 天 ";
+         }
+         //计算出小时数
+         var leave1 = date % (24 * 3600 * 1000) //计算天数后剩余的毫秒数
+         var hours = Math.floor(leave1 / (3600 * 1000))
+         if (hours > 0) {
+             str += hours + " 小时 ";
+         }
+         //计算相差分钟数
+         var leave2 = leave1 % (3600 * 1000) //计算小时数后剩余的毫秒数
+         var minutes = Math.floor(leave2 / (60 * 1000))
+         if (minutes > 0) {
+             str += minutes + " 分 ";
+         }
+         //计算相差秒数
+         var leave3 = leave2 % (60 * 1000) //计算分钟数后剩余的毫秒数
+         var seconds = Math.round(leave3 / 1000)
+         if (seconds > 0) {
+             str += seconds + " 秒 ";
+         } else {
+             /* str += parseInt(date) + " 毫秒"; */
+             str += " < 1 秒";
+         }
+         return str;
+     }
+     /*]]>*/
+     </script>
+     ```
 
    
 
