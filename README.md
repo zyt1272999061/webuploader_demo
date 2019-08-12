@@ -11,7 +11,25 @@
 * webuploader官网：https://fex.baidu.com/webuploader/
 * bootstrap官网：https://www.bootcss.com/
 
-## 三、技术实现
+## 三、页面效果
+
+1. 访问路径：http://localhost:8080/upload/index 
+
+2. 页面效果
+
+   - 首页
+
+     ![首页](https://github.com/zyt1272999061/webuploader_demo/blob/master/images/index.bmp)
+
+   - 选择文件
+
+     ![等待上传](https://github.com/zyt1272999061/webuploader_demo/blob/master/images/paused.bmp)
+
+   - 开始上传/暂停上传
+
+     ![暂停上传](https://github.com/zyt1272999061/webuploader_demo/blob/master/images/waiting.bmp)
+
+## 四、技术实现
 
 ~~~flow
 ```flow
@@ -24,7 +42,7 @@ st->op->op1->op2()->e
 &```
 ~~~
 
-## 四、代码实现
+## 五、代码实现
 
 1. pom.xml
 
@@ -556,23 +574,3 @@ st->op->op1->op2()->e
        }
    }
    ```
-
-
-
-## 五、页面效果
-
-1. 访问路径：http://localhost:8080/upload/index 
-
-2. 页面效果
-
-   * 首页
-
-     ![index](https://github.com/zyt1272999061/webuploader_demo/blob/master/images/index.bmp)
-
-   * 选择文件
-
-     ![等待上传]([https://github.com/zyt1272999061/webuploader_demo/blob/master/images/%E7%AD%89%E5%BE%85%E4%B8%8A%E4%BC%A0.bmp](https://github.com/zyt1272999061/webuploader_demo/blob/master/images/等待上传.bmp))
-
-   * 开始上传/暂停上传
-
-     ![暂停上传]([https://github.com/zyt1272999061/webuploader_demo/blob/master/images/%E6%9A%82%E5%81%9C%E4%B8%8A%E4%BC%A0.bmp](https://github.com/zyt1272999061/webuploader_demo/blob/master/images/暂停上传.bmp))
