@@ -26,7 +26,36 @@
                     </div>
                 </div>
             </div>
-
+        </div>
+    </div>
+    <div class="row" style="margin-top: 20px;">
+        <div class="col-md-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">下载(显示上传路径:<span th:text="${uploadPath}"></span>下的文件)</h3>
+                    <br>
+                    <button id="btn_refesh" type="button" class="btn btn-info">刷新</button>
+                </div>
+                <div class="panel-body">
+                    <table class="table table-striped table-bordered table-hover">
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>文件名称</th>
+                            <th>修改日期</th>
+                            <th>文件类型</th>
+                            <th>文件大小</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody id="fileList">
+                        <tr>
+                            <td colspan="6" class="text-center">暂无数据</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -218,6 +247,7 @@
             uploader.upload();
         }
     });
+
     //删除文件
     function delFile(id) {
         //将文件从uploader的文件列表中删除
@@ -225,6 +255,7 @@
         //清除页面元素
         $("#" + id).remove();
     }
+
     //获取上传时还需多少时间
     function countTime(date) {
         var str = "";
@@ -256,6 +287,60 @@
         }
         return str;
     }
+
+    //刷新
+    $("#btn_refesh").click(function () {
+        $("#fileList").empty();
+        $.ajax({
+            type: "GET",
+            url: /*[[@{/upload/getFiles}]]*/,
+            dataType: "json",
+            success: function (data) {
+                let fileList = data.fileList;
+                if (null != fileList && fileList instanceof Array && fileList.length > 0) {
+                    for (let i = 0; i < fileList.length; i++) {
+                        $("#fileList")
+                            .append("<tr>" +
+                                "<td scope='row' class='text-center'>" + (i + 1) + "</td>" +
+                                "<td class='text-center'>" + fileList[i].fileName + "</td>" +
+                                "<td class='text-center'>" + fileList[i].modifyTime + "</td>" +
+                                "<td class='text-center'>" + fileList[i].fileType + "</td>" +
+                                "<td class='text-center'>" + fileList[i].fileSize + "</td>" +
+                                "<td class='text-center'><a class='btn btn-success' href='/upload/downloadFile?fileName=" + fileList[i].fileName + "'>下载</a>   " +
+                                "<a class='btn btn-danger' href='javascript:void(0)' onclick='delFile(\"" + fileList[i].fileName + "\")'>删除</a></td>" +
+                                "</tr>");
+
+                    }
+                } else {
+                    $("#fileList").append("<tr><td colspan='6' class='text-center'>暂无数据</td></tr>")
+                }
+            }
+        });
+    });
+
+    //删除文件
+    function delFile(fileName) {
+        if (confirm("确定删除？")) {
+            $.ajax({
+                type: "GET",
+                url: /*[[@{/upload/delFile}]]*/,
+                data: {
+                    "fileName": fileName
+                },
+                async:true,
+                dataType: "json",
+                success: function (data) {
+                    if ("true" == data.result) {
+                        alert("删除成功！");
+                    } else {
+                        alert("删除失败！");
+                    }
+                }
+            });
+            $("#btn_refesh").click();
+        }
+    }
+
     /*]]>*/
 </script>
 </html>

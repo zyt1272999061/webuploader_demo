@@ -1,31 +1,37 @@
 package com.github.zyt.webuploader.contorller;
 
-import ch.qos.logback.classic.Logger;
-import org.slf4j.LoggerFactory;
+import com.github.zyt.webuploader.entity.FileEntity;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.ModelAndView;
 
+import javax.activation.MimetypesFileTypeMap;
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 /**
  * 分片上传Controller
  */
 @Controller
 @RequestMapping("upload")
+@Slf4j
 public class UploadController {
 
-    private static Logger logger = (Logger) LoggerFactory.getLogger(UploadController.class);
 
     /**
      * 上传路径
      */
-    private static String uploadPath = "D:/upload";
+    @Value("${upload_path}")
+    private String uploadPath;
 
     /**
      * 跳转到首页
@@ -33,8 +39,10 @@ public class UploadController {
      * @return
      */
     @GetMapping("index")
-    public String toUpload() {
-        return "/upload";
+    public ModelAndView toUpload() {
+        ModelAndView mav = new ModelAndView("/upload");
+        mav.addObject("uploadPath", uploadPath + File.separator + "real");
+        return mav;
     }
 
     /**
@@ -133,7 +141,7 @@ public class UploadController {
         FileChannel fcin = null;
         FileChannel fcout = null;
         try {
-            logger.info("合并文件——开始 [ 文件名称：" + fileName + " ，MD5值：" + guid + " ]");
+            log.info("合并文件——开始 [ 文件名称：" + fileName + " ，MD5值：" + guid + " ]");
             os = new FileOutputStream(realFile, true);
             fcout = os.getChannel();
             if (tempPath.exists()) {
@@ -177,10 +185,107 @@ public class UploadController {
                     System.gc(); // 回收资源
                     tempPath.delete();
                 }
-                logger.info("文件合并——结束 [ 文件名称：" + fileName + " ，MD5值：" + guid + " ]");
+                log.info("文件合并——结束 [ 文件名称：" + fileName + " ，MD5值：" + guid + " ]");
             }
         } catch (Exception e) {
-            logger.error("文件合并——失败 " + e.getMessage());
+            log.error("文件合并——失败 " + e.getMessage());
         }
+    }
+
+    /**
+     * 查询上传目录下的全部文件
+     *
+     * @return
+     */
+    @GetMapping("/getFiles")
+    @ResponseBody
+    public Map getFiles() {
+        Map map = new HashMap();
+        String realUploadPath = uploadPath + File.separator + "real";
+        File directory = new File(realUploadPath);
+        File[] files = directory.listFiles();
+        List<FileEntity> fileList = new ArrayList<>();
+        if (null != files && files.length > 0) {
+            for (File file : files) {
+                fileList.add(new FileEntity(file.getName(), getDate(file.lastModified()), file.getName().substring(file.getName().lastIndexOf(".")), Math.round(file.length() / 1024) + "KB"));
+            }
+        }
+        map.put("fileList", fileList);
+        return map;
+
+    }
+
+    /**
+     * Long 转 Date
+     *
+     * @param time
+     * @return
+     */
+    private String getDate(Long time) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss");
+        Date date = new Date(time);
+        return sdf.format(date);
+    }
+
+    /**
+     * 文件下载
+     *
+     * @param fileName 文件名称
+     * @param response HttpServletResponse
+     */
+    @GetMapping("downloadFile")
+    @ResponseBody
+    public void downLoadFile(String fileName, HttpServletResponse response) {
+        File file = new File(uploadPath + File.separator + "real" + File.separator + fileName);
+        if (file.exists()) {
+            InputStream is = null;
+            OutputStream os = null;
+            try {
+                response.reset();
+                // 设置强制下载不打开
+                response.setContentType("application/force-download");
+                //设置下载文件名
+                response.addHeader("Content-Disposition", "attachment;filename=" + fileName);
+                response.addHeader("Content-Length", "" + file.length());
+                //定义输入输出流
+                os = new BufferedOutputStream(response.getOutputStream());
+                is = new BufferedInputStream(new FileInputStream(file));
+                byte[] buffer = new byte[1024];
+                int len;
+                while ((len = is.read(buffer)) > 0) {
+                    os.write(buffer, 0, len);
+                    os.flush();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    is.close();
+                    os.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                log.info("文件下载成功——文件名：" + fileName);
+            }
+        }
+    }
+
+    /**
+     * 删除文件
+     *
+     * @param fileName
+     * @return
+     */
+    @GetMapping("/delFile")
+    @ResponseBody
+    public Map delFile(String fileName) {
+        boolean b = false;
+        File file = new File(uploadPath + File.separator + "real" + File.separator + fileName);
+        if (file.exists() && file.isFile()) {
+            b = file.delete();
+        }
+        Map map = new HashMap();
+        map.put("result", b + "");
+        return map;
     }
 }
