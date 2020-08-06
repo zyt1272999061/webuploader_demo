@@ -126,6 +126,12 @@ st->op->op1->op2()->e
 2. application.properties
 
    ```properties
+   server.port=8080
+   server.tomcat.max-threads=6
+   server.tomcat.min-spare-threads=3
+   server.tomcat.accept-count=10
+   server.tomcat.max-connections=1000
+   
    # thymeleaf
    spring.thymeleaf.prefix=classpath:/templates/
    spring.thymeleaf.suffix=.html
