@@ -500,7 +500,9 @@ st->op->op1->op2()->e
                      }
              	}
          	});
-         	$("#btn_refesh").click();
+             setTimeout(function () {
+                 $("#btn_refesh").click()
+             }, 1000);
      	}
      }
      /*]]>*/

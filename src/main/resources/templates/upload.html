@@ -66,6 +66,8 @@
 <script type="application/javascript" th:src="@{/webuploader/webuploader.js}"></script>
 <script th:inline="javascript" type="application/javascript">
     /*<![CDATA[*/
+    var ctxPath = /*[[@{/}]]*/ '';
+
     var $ = jQuery,
         $list = $('#thelist'),
         $btn = $('#ctlBtn'),
@@ -288,6 +290,7 @@
         return str;
     }
 
+
     //刷新
     $("#btn_refesh").click(function () {
         $("#fileList").empty();
@@ -306,7 +309,7 @@
                                 "<td class='text-center'>" + fileList[i].modifyTime + "</td>" +
                                 "<td class='text-center'>" + fileList[i].fileType + "</td>" +
                                 "<td class='text-center'>" + fileList[i].fileSize + "</td>" +
-                                "<td class='text-center'><a class='btn btn-success' href='/upload/downloadFile?fileName=" + fileList[i].fileName + "'>下载</a>   " +
+                                "<td class='text-center'><a class='btn btn-success' href='" + ctxPath + "upload/downloadFile?fileName=" + fileList[i].fileName + "'>下载</a>   " +
                                 "<a class='btn btn-danger' href='javascript:void(0)' onclick='delFile(\"" + fileList[i].fileName + "\")'>删除</a></td>" +
                                 "</tr>");
 
@@ -327,7 +330,7 @@
                 data: {
                     "fileName": fileName
                 },
-                async:true,
+                async: true,
                 dataType: "json",
                 success: function (data) {
                     if ("true" == data.result) {
@@ -337,7 +340,9 @@
                     }
                 }
             });
-            $("#btn_refesh").click();
+            setTimeout(function () {
+                $("#btn_refesh").click()
+            }, 1000);
         }
     }
 

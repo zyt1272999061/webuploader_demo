@@ -40,7 +40,7 @@ public class UploadController {
      */
     @GetMapping("index")
     public ModelAndView toUpload() {
-        ModelAndView mav = new ModelAndView("/upload");
+        ModelAndView mav = new ModelAndView("upload");
         mav.addObject("uploadPath", uploadPath + File.separator + "real");
         return mav;
     }
