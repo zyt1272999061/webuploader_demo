@@ -83,6 +83,12 @@ st->op->op1->op2()->e
                <artifactId>spring-boot-devtools</artifactId>
                <scope>runtime</scope>
            </dependency>
+           <!--lombok-->
+           <dependency>
+               <groupId>org.projectlombok</groupId>
+               <artifactId>lombok</artifactId>
+               <version>1.18.12</version>
+           </dependency>
            <dependency>
                <groupId>org.springframework.boot</groupId>
                <artifactId>spring-boot-starter-test</artifactId>
@@ -131,11 +137,14 @@ st->op->op1->op2()->e
    spring.servlet.multipart.enabled=true
    spring.servlet.multipart.max-file-size=5GB
    spring.servlet.multipart.max-request-size=5GB
+   
+   #文件路径
+   upload_path=D:\\upload
    ```
 
    
 
-3. 上传页面
+3. 上传下载页面
 
    * 引入css、js
 
@@ -172,7 +181,36 @@ st->op->op1->op2()->e
                          </div>
                      </div>
                  </div>
-     
+             </div>
+         </div>
+         <div class="row" style="margin-top: 20px;">
+             <div class="col-md-12">
+                 <div class="panel panel-default">
+                     <div class="panel-heading">
+                         <h3 class="panel-title">下载(显示上传路径:<span th:text="${uploadPath}"></span>下的文件)</h3>
+                         <br>
+                         <button id="btn_refesh" type="button" class="btn btn-info">刷新</button>
+                     </div>
+                     <div class="panel-body">
+                         <table class="table table-striped table-bordered table-hover">
+                             <thead>
+                             <tr>
+                                 <td>#</td>
+                                 <td>文件名称</td>
+                                 <td>修改日期</td>
+                                 <td>文件类型</td>
+                                 <td>文件大小</td>
+                                 <td>操作</td>
+                             </tr>
+                             </thead>
+                             <tbody id="fileList">
+                             <tr>
+                                 <td colspan="6" class="text-center">暂无数据</td>
+                             </tr>
+                             </tbody>
+                         </table>
+                     </div>
+                 </div>
              </div>
          </div>
      </div>
@@ -404,6 +442,39 @@ st->op->op1->op2()->e
          }
          return str;
      }
+     
+       //刷新
+         $("#btn_refesh").click(function () {
+             $("#fileList").empty();
+             $.ajax({
+                 type: "GET",
+                 url: /*[[@{/upload/getFiles}]]*/,
+                 cache: false,
+                 async: false,
+                 timeout: 1000,
+                 dataType: "json",
+                 success: function (data) {
+                     let fileList = data.fileList;
+                     if (null != fileList && fileList instanceof Array && fileList.length > 0) {
+                         for (let i = 0; i < fileList.length; i++) {
+                             $("#fileList")
+                                 .append("<tr>" +
+                                     "<td scope='row' class='text-center'>" + (i + 1) + "</td>" +
+                                     "<td class='text-center'>" + fileList[i].fileName + "</td>" +
+                                     "<td class='text-center'>" + fileList[i].modifyTime + "</td>" +
+                                     "<td class='text-center'>" + fileList[i].fileType + "</td>" +
+                                     "<td class='text-center'>" + fileList[i].fileSize + "</td>" +
+                                     "<td class='text-center'><a class='btn btn-success' href='/upload/downLoadFile?fileName=" + fileList[i].fileName + "'>下载</></td>" +
+                                     "</tr>");
+     
+                         }
+                     } else {
+                         $("#fileList").append("<tr><td colspan='6' class='text-center'>暂无数据</td></tr>")
+                     }
+                 }
+             });
+         });
+     
      /*]]>*/
      </script>
      ```
@@ -523,7 +594,7 @@ st->op->op1->op2()->e
        FileChannel fcin = null;
        FileChannel fcout = null;
        try {
-           logger.info("合并文件——开始 [ 文件名称：" + fileName + " ，MD5值：" + guid + " ]");
+           log.info("合并文件——开始 [ 文件名称：" + fileName + " ，MD5值：" + guid + " ]");
            os = new FileOutputStream(realFile, true);
            fcout = os.getChannel();
            if (tempPath.exists()) {
@@ -567,10 +638,111 @@ st->op->op1->op2()->e
                    System.gc(); // 回收资源
                    tempPath.delete();
                }
-               logger.info("文件合并——结束 [ 文件名称：" + fileName + " ，MD5值：" + guid + " ]");
+               log.info("文件合并——结束 [ 文件名称：" + fileName + " ，MD5值：" + guid + " ]");
            }
        } catch (Exception e) {
-           logger.error("文件合并——失败 " + e.getMessage());
+           log.error("文件合并——失败 " + e.getMessage());
        }
    }
    ```
+   
+   * 查询上传目录下文件
+   
+   ~~~java
+    /**
+     * 查询上传目录下的全部文件
+     *
+     * @return
+     */
+   @GetMapping("/getFiles")
+   @ResponseBody
+   public Map getFiles() {
+       Map map = new HashMap();
+       String realUploadPath = uploadPath + File.separator + "real";
+       File directory = new File(realUploadPath);
+       File[] files = directory.listFiles();
+       List<FileEntity> fileList = new ArrayList<>();
+       if (null != files && files.length > 0) {
+           for (File file : files) {
+               fileList.add(new FileEntity(file.getName(), getDate(file.lastModified()), file.getName().substring(file.getName().lastIndexOf(".")), Math.round(file.length() / 1024) + "KB"));
+           }
+       }
+       map.put("fileList", fileList);
+       return map;
+   
+   }
+   ~~~
+   
+   * 文件下载
+   
+   ~~~java
+   /**
+    * 文件下载
+    *
+    * @param fileName 文件名称
+    * @param response HttpServletResponse
+    */
+   @GetMapping("downloadFile")
+   @ResponseBody
+   public void downLoadFile(String fileName, HttpServletResponse response) {
+       File file = new File(uploadPath + File.separator + "real" + File.separator + fileName);
+       if (file.exists()) {
+           InputStream is = null;
+           OutputStream os = null;
+           try {
+               response.reset();
+               // 设置强制下载不打开
+               response.setContentType("application/force-download");
+               //设置下载文件名
+               response.addHeader("Content-Disposition", "attachment;filename=" + fileName);
+               response.addHeader("Content-Length", "" + file.length());
+               //定义输入输出流
+               os = new BufferedOutputStream(response.getOutputStream());
+               is = new BufferedInputStream(new FileInputStream(file));
+               byte[] buffer = new byte[1024];
+               int len;
+               while ((len = is.read(buffer)) > 0) {
+                   os.write(buffer, 0, len);
+                   os.flush();
+               }
+           } catch (IOException e) {
+               e.printStackTrace();
+           } finally {
+               try {
+                   is.close();
+                   os.close();
+               } catch (IOException e) {
+                   e.printStackTrace();
+               }
+               log.info("文件下载成功——文件名：" + fileName);
+           }
+       }
+   
+   }
+   ~~~
+   
+   * 文件删除
+   
+   ~~~java
+   /**
+    * 删除文件
+    *
+    * @param fileName
+    * @return
+    */
+   @GetMapping("/delFile")
+   @ResponseBody
+   public Map delFile(String fileName) {
+       boolean b = false;
+       File file = new File(uploadPath + File.separator + "real" + File.separator + fileName);
+       if (file.exists() && file.isFile()) {
+           b = file.delete();
+       }
+       Map map = new HashMap();
+       map.put("result", b + "");
+       return map;
+   }
+   ~~~
+   
+   
+
