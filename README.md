@@ -28,6 +28,10 @@
    - 开始上传/暂停上传
 
      ![暂停上传](https://github.com/zyt1272999061/webuploader_demo/blob/master/images/waiting.bmp)
+     
+   - 下载/删除
+   
+     ![下载](https://github.com/zyt1272999061/webuploader_demo/blob/master/images/download.bmp)
 
 ## 四、技术实现
 
@@ -195,12 +199,12 @@ st->op->op1->op2()->e
                          <table class="table table-striped table-bordered table-hover">
                              <thead>
                              <tr>
-                                 <td>#</td>
-                                 <td>文件名称</td>
-                                 <td>修改日期</td>
-                                 <td>文件类型</td>
-                                 <td>文件大小</td>
-                                 <td>操作</td>
+                                 <th>#</th>
+                                 <th>文件名称</th>
+                                 <th>修改日期</th>
+                                 <th>文件类型</th>
+                                 <th>文件大小</th>
+                                 <th>操作</th>
                              </tr>
                              </thead>
                              <tbody id="fileList">
@@ -442,39 +446,57 @@ st->op->op1->op2()->e
          }
          return str;
      }
-     
-       //刷新
-         $("#btn_refesh").click(function () {
-             $("#fileList").empty();
-             $.ajax({
-                 type: "GET",
-                 url: /*[[@{/upload/getFiles}]]*/,
-                 cache: false,
-                 async: false,
-                 timeout: 1000,
-                 dataType: "json",
-                 success: function (data) {
-                     let fileList = data.fileList;
-                     if (null != fileList && fileList instanceof Array && fileList.length > 0) {
-                         for (let i = 0; i < fileList.length; i++) {
-                             $("#fileList")
-                                 .append("<tr>" +
+     //刷新
+     $("#btn_refesh").click(function () {
+         $("#fileList").empty();
+         $.ajax({
+             type: "GET",
+             url: /*[[@{/upload/getFiles}]]*/,
+             dataType: "json",
+             success: function (data) {
+                 let fileList = data.fileList;
+                 if (null != fileList && fileList instanceof Array && fileList.length > 0) {
+                     for (let i = 0; i < fileList.length; i++) {
+                         $("#fileList")
+                             .append("<tr>" +
                                      "<td scope='row' class='text-center'>" + (i + 1) + "</td>" +
                                      "<td class='text-center'>" + fileList[i].fileName + "</td>" +
                                      "<td class='text-center'>" + fileList[i].modifyTime + "</td>" +
                                      "<td class='text-center'>" + fileList[i].fileType + "</td>" +
                                      "<td class='text-center'>" + fileList[i].fileSize + "</td>" +
-                                     "<td class='text-center'><a class='btn btn-success' href='/upload/downLoadFile?fileName=" + fileList[i].fileName + "'>下载</></td>" +
+                                     "<td class='text-center'><a class='btn btn-success' href='/upload/downloadFile?fileName=" + fileList[i].fileName + "'>下载</a>   " +
+                                     "<a class='btn btn-danger' href='javascript:void(0)' onclick='delFile(\"" + fileList[i].fileName + "\")'>删除</a></td>" +
                                      "</tr>");
-     
-                         }
-                     } else {
-                         $("#fileList").append("<tr><td colspan='6' class='text-center'>暂无数据</td></tr>")
                      }
+                 } else {
+                     $("#fileList").append("<tr><td colspan='6' class='text-center'>暂无数据</td></tr>")
                  }
-             });
-         });
+         }
+     });
+     });
      
+     //删除文件
+     function delFile(fileName) {
+         if (confirm("确定删除？")) {
+             $.ajax({
+                 type: "GET",
+                 url: /*[[@{/upload/delFile}]]*/,
+                 data: {
+                 "fileName": fileName
+             	},
+                 async:true,
+                 dataType: "json",
+                 success: function (data) {
+                     if ("true" == data.result) {
+                         alert("删除成功！");
+                     } else {
+                         alert("删除失败！");
+                     }
+             	}
+         	});
+         	$("#btn_refesh").click();
+     	}
+     }
      /*]]>*/
      </script>
      ```
